@@ -1,4 +1,5 @@
-# Publishes to pub.dev when a version tag such as v0.1.1 is pushed.
+# Publishes to pub.dev when a version tag such as v0.1.1 is pushed, then
+# creates a GitHub Release whose notes are that version's CHANGELOG.md section.
 #
 # One-time setup, after the first version was published by hand:
 # pub.dev → package → Admin → Automated publishing → Enable publishing from
@@ -16,3 +17,32 @@ jobs:
     permissions:
       id-token: write # Lets pub.dev verify the run with OIDC; no secrets needed.
     uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+
+  # Only after pub.dev accepted the version, so every Release is installable.
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Creates the Release.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '$0 == "## " v {found=1; next} found && /^## / {exit} found' \
+            CHANGELOG.md | sed '/./,$!d' > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::CHANGELOG.md has no '## $version' section"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Tags like v0.2.0-dev.1 become pre-releases.
+          prerelease=""
+          [[ "$GITHUB_REF_NAME" == *-* ]] && prerelease="--prerelease"
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "$GITHUB_REF_NAME" --notes-file notes.md $prerelease
