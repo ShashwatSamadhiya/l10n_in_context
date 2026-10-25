@@ -194,13 +194,16 @@ final class L10nConfig {
         'l10n.yaml not found; run from the app root',
       );
     }
+    return parse(file.readAsStringSync());
+  }
+
+  /// Parses the contents of an `l10n.yaml`.
+  static L10nConfig parse(String contents) {
     final values = <String, String>{};
-    for (final line in file.readAsLinesSync()) {
+    for (final line in const LineSplitter().convert(contents)) {
       final match = RegExp(r'^([\w-]+)\s*:\s*(.+?)\s*$').firstMatch(line);
       if (match == null) continue;
-      values[match.group(1)!] = match
-          .group(2)!
-          .replaceAll(RegExp('''^['"]|['"]\$'''), '');
+      values[match.group(1)!] = _scalar(match.group(2)!);
     }
     if (values['synthetic-package'] == 'true') {
       throw const GeneratorException(
@@ -217,6 +220,14 @@ final class L10nConfig {
           values['output-localization-file'] ?? 'app_localizations.dart',
       outputClass: values['output-class'] ?? 'AppLocalizations',
     );
+  }
+
+  /// A YAML scalar without its quotes or trailing comment:
+  /// `lib/l10n # ARB files` → `lib/l10n`, `'a # b' # c` → `a # b`.
+  static String _scalar(String raw) {
+    final quoted = RegExp(r'''^(['"])(.*?)\1''').firstMatch(raw);
+    if (quoted != null) return quoted.group(2)!;
+    return raw.replaceFirst(RegExp(r'\s+#.*$'), '').trim();
   }
 }
 

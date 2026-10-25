@@ -94,6 +94,44 @@ void main() {
     });
   });
 
+  group('L10nConfig.parse', () {
+    test('ignores trailing comments and quotes', () {
+      final config = L10nConfig.parse('''
+# Localization settings
+arb-dir: lib/l10n # ARB files
+template-arb-file: "app_en.arb"  # the template
+output-class: 'Strings' # generated class
+output-localization-file: strings.dart
+''');
+      expect(config.arbDir, 'lib/l10n');
+      expect(config.templateArbFile, 'app_en.arb');
+      expect(config.outputClass, 'Strings');
+      expect(config.generatedFilePath, 'lib/l10n/strings.dart');
+    });
+
+    test('keeps # inside quotes and without a space before it', () {
+      final config = L10nConfig.parse('''
+arb-dir: 'lib/l10n #1' # comment
+output-class: App#Strings
+''');
+      expect(config.arbDir, 'lib/l10n #1');
+      expect(config.outputClass, 'App#Strings');
+    });
+
+    test('rejects synthetic-package even with a comment', () {
+      expect(
+        () => L10nConfig.parse('synthetic-package: true # legacy'),
+        throwsA(isA<GeneratorException>()),
+      );
+    });
+
+    test('uses gen-l10n defaults', () {
+      final config = L10nConfig.parse('');
+      expect(config.arbDir, 'lib/l10n');
+      expect(config.outputClass, 'AppLocalizations');
+    });
+  });
+
   test('defaults the output next to the gen-l10n file', () {
     expect(_config.defaultOutputPath, 'lib/l10n/app_strings_override.dart');
   });
