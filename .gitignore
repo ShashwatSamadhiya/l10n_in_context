@@ -4,3 +4,4 @@ pubspec.lock
 example/.dart_tool/
 example/build/
 example/pubspec.lock
+RELEASING.md
