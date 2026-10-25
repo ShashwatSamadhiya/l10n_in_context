@@ -1,0 +1,32 @@
+name: l10n_in_context
+description: >-
+  In-context translation editing for Flutter apps that use gen-l10n. Tap any
+  string in the running app, edit it, preview drafts live and publish through
+  your own backend.
+version: 0.1.0
+repository: https://github.com/ShashwatSamadhiya/l10n_in_context
+issue_tracker: https://github.com/ShashwatSamadhiya/l10n_in_context/issues
+topics:
+  - localization
+  - l10n
+  - i18n
+  - translation
+  - arb
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+  flutter: ">=3.32.0"
+
+dependencies:
+  equatable: ">=2.0.5 <4.0.0"
+  flutter:
+    sdk: flutter
+  flutter_bloc: ">=8.1.6 <10.0.0"
+  fpdart: ^1.1.0
+  intl: ">=0.19.0 <0.21.0"
+
+dev_dependencies:
+  bloc_test: ">=9.1.7 <11.0.0"
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

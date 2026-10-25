@@ -1,0 +1,19 @@
+{
+  "@@locale": "en",
+  "appTitle": "Pond diary",
+  "@appTitle": {"description": "App bar title"},
+  "greeting": "Good morning, {name}",
+  "@greeting": {
+    "description": "Greeting on the home screen",
+    "placeholders": {"name": {"type": "String", "example": "Asha"}}
+  },
+  "pondCount": "{count, plural, =0{No ponds yet} =1{1 pond} other{{count} ponds}}",
+  "@pondCount": {
+    "description": "Number of ponds the user owns",
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "addPond": "Add pond",
+  "@addPond": {"description": "Button that adds a pond"},
+  "canEditLabel": "Everyone can edit",
+  "@canEditLabel": {"description": "Switch that grants edit access in the demo"}
+}
