@@ -12,6 +12,13 @@ topics:
   - i18n
   - translation
   - arb
+screenshots:
+  - description: Tap a string in the running app, edit it and see the draft live.
+    path: doc/screenshots/demo.gif
+  - description: Editor toolbar for picking strings, browsing keys and signing out.
+    path: doc/screenshots/toolbar.png
+  - description: Edit dialog with every language, a live preview and validation.
+    path: doc/screenshots/edit_dialog.png
 
 environment:
   sdk: ">=3.8.0 <4.0.0"

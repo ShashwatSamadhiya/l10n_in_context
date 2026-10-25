@@ -9,6 +9,11 @@ Translators and reviewers open the running app, tap any string, edit it in
 every language, and see their draft on screen immediately. When the drafts
 look right, they publish them to every user, with no new app build.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ShashwatSamadhiya/l10n_in_context/main/doc/screenshots/demo.gif" alt="Tapping a string, editing it and seeing the draft live" width="300">
+  <img src="https://raw.githubusercontent.com/ShashwatSamadhiya/l10n_in_context/main/doc/screenshots/edit_dialog.png" alt="Edit dialog with every language and a live preview" width="300">
+</p>
+
 - Works with your existing ARB files and `AppLocalizations.of(context)`.
   Screens don't change.
 - Works with **any backend**. You implement two small interfaces, so
