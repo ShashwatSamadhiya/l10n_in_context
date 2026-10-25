@@ -3,11 +3,17 @@
 [![pub package](https://img.shields.io/pub/v/l10n_in_context.svg)](https://pub.dev/packages/l10n_in_context)
 [![CI](https://github.com/ShashwatSamadhiya/l10n_in_context/actions/workflows/ci.yml/badge.svg)](https://github.com/ShashwatSamadhiya/l10n_in_context/actions/workflows/ci.yml)
 
-In-context translation editing for Flutter apps that use `flutter gen-l10n`.
+In-context translation editing and over-the-air (OTA) translation updates
+for Flutter apps that use `flutter gen-l10n` and ARB files.
 
 Translators and reviewers open the running app, tap any string, edit it in
 every language, and see their draft on screen immediately. When the drafts
-look right, they publish them to every user, with no new app build.
+look right, they publish them to every user: you update translations without
+an app release or a store review.
+
+It is self-hosted live translation editing, in the spirit of the in-context
+editors of translation management tools, but the strings stay in your own
+Firebase, Supabase or REST backend.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ShashwatSamadhiya/l10n_in_context/main/doc/screenshots/demo.gif" alt="Tapping a string, editing it and seeing the draft live" width="300">
@@ -22,6 +28,15 @@ look right, they publish them to every user, with no new app build.
   people who pass your own login, OTP or SSO flow.
 - Messages are validated before saving: ICU syntax, plurals and selects, and
   placeholders that must match the ARB.
+
+## Platforms
+
+| Android | iOS | Web | macOS | Windows | Linux |
+| :-----: | :-: | :-: | :---: | :-----: | :---: |
+|    ✅    |  ✅  |  ✅  |   ✅   |    ✅    |   ✅   |
+
+Pure Dart and Flutter, with no platform channels. Requires Flutter 3.32 or
+later (Dart 3.8).
 
 ## How it works
 
@@ -96,7 +111,8 @@ shows that message. The rules each method must follow are in the API docs of
 `L10nTranslationDataSource`.
 
 To try the package without a backend, use `InMemoryL10nAccessDataSource` and
-`InMemoryL10nTranslationDataSource`.
+`InMemoryL10nTranslationDataSource`. For a complete backend, see
+[Example: Firebase (Firestore)](#example-firebase-firestore).
 
 ### 3. Wrap `MaterialApp`
 
@@ -121,6 +137,118 @@ InContextEditor(
 That is the only change to existing code. If you already use
 `MaterialApp.builder`, nest yours:
 `builder: (context, child) => l10n.overlay(context, myBuilder(context, child))`.
+
+## Example: Firebase (Firestore)
+
+Store each language in one document per collection, with message keys as
+fields: `l10n_drafts/{lang}` and `l10n_published/{lang}`. gen-l10n keys are
+Dart identifiers, so they are valid field names.
+
+```dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:l10n_in_context/l10n_in_context.dart';
+
+/// Signed-in users with a `translator` custom claim may edit.
+class FirebaseAccessDataSource implements L10nAccessDataSource {
+  @override
+  Stream<EditorUser?> watchEditor() =>
+      FirebaseAuth.instance.idTokenChanges().asyncMap((user) async {
+        if (user == null) return null;
+        final token = await user.getIdTokenResult();
+        if (token.claims?['translator'] != true) return null;
+        return EditorUser(id: user.uid, displayName: user.email);
+      });
+}
+
+class FirestoreTranslationDataSource implements L10nTranslationDataSource {
+  final _db = FirebaseFirestore.instance;
+  CollectionReference<Map<String, dynamic>> get _drafts =>
+      _db.collection('l10n_drafts');
+  CollectionReference<Map<String, dynamic>> get _published =>
+      _db.collection('l10n_published');
+
+  @override
+  Stream<MessagesByLanguage> watchDrafts() => _watch(_drafts);
+
+  @override
+  Stream<MessagesByLanguage> watchPublished() => _watch(_published);
+
+  @override
+  Future<void> saveDraft({
+    required EditorUser editor,
+    required String languageCode,
+    required String key,
+    required String value,
+    String? previousValue,
+  }) => _guard(
+    () => _drafts.doc(languageCode).set({key: value}, SetOptions(merge: true)),
+  );
+
+  @override
+  Future<void> importDrafts({
+    required EditorUser editor,
+    required MessagesByLanguage messages,
+  }) => _guard(() {
+    final batch = _db.batch();
+    messages.forEach((lang, byKey) {
+      batch.set(_drafts.doc(lang), byKey, SetOptions(merge: true));
+    });
+    return batch.commit();
+  });
+
+  @override
+  Future<void> publish({
+    required EditorUser editor,
+    required MessagesByLanguage messages,
+    required List<String> changedKeys,
+  }) => _guard(() {
+    final batch = _db.batch();
+    // No merge: each language becomes exactly these messages.
+    messages.forEach((lang, byKey) => batch.set(_published.doc(lang), byKey));
+    batch.set(_db.collection('l10n_audit').doc(), {
+      'editor': editor.id,
+      'changedKeys': changedKeys,
+      'at': FieldValue.serverTimestamp(),
+    });
+    return batch.commit();
+  });
+
+  Stream<MessagesByLanguage> _watch(
+    CollectionReference<Map<String, dynamic>> collection,
+  ) => collection.snapshots().map(
+    (snapshot) => {
+      for (final doc in snapshot.docs)
+        doc.id: doc.data().map((key, value) => MapEntry(key, '$value')),
+    },
+  );
+
+  Future<void> _guard(Future<void> Function() write) async {
+    try {
+      await write();
+    } on FirebaseException catch (e) {
+      throw L10nDataSourceException(e.message ?? e.code, cause: e);
+    }
+  }
+}
+```
+
+Enforce the same rule in `firestore.rules`:
+
+```
+match /l10n_published/{lang} {
+  allow read: if true;
+  allow write: if request.auth.token.translator == true;
+}
+match /{collection}/{doc} {
+  allow read, write: if collection in ['l10n_drafts', 'l10n_audit']
+    && request.auth.token.translator == true;
+}
+```
+
+For over-the-air updates in every user's app, read `l10n_published` once at
+startup (or listen to it) and pass the result to
+`AppLocalizationsOverrideDelegate(messages: ...)`.
 
 ## Who may edit
 

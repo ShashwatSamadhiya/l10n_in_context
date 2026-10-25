@@ -1,3 +1,8 @@
+## 0.1.1
+
+- Docs: a complete Firebase (Firestore) data source example with security
+  rules, a list of supported platforms, and a clearer package description.
+
 ## 0.1.0
 
 - First release.
