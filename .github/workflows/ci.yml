@@ -48,6 +48,15 @@ jobs:
       - name: Publish dry run
         run: dart pub publish --dry-run
 
+      # The same scoring pub.dev runs: fails on any lost point, e.g. a
+      # description over 180 characters, which the dry run does not check.
+      # The webp tools let it validate the screenshots.
+      - name: pub.dev score (pana)
+        run: |
+          sudo apt-get install -y --no-install-recommends webp
+          dart pub global activate pana
+          dart pub global run pana --no-warning --exit-code-threshold 0 .
+
   minimum:
     name: Test on minimum versions (Flutter 3.32)
     runs-on: ubuntu-latest

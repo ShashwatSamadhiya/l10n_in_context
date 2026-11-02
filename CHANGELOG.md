@@ -1,3 +1,7 @@
+## 0.1.2
+
+- Shorten the package description to pub.dev's 180-character limit.
+
 ## 0.1.1
 
 - Docs: a complete Firebase (Firestore) data source example with security
