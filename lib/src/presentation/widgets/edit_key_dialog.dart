@@ -104,6 +104,22 @@ class _EditKeyDialogState extends State<EditKeyDialog> {
     );
   }
 
+  /// Languages whose draft of this key isn't published yet.
+  List<String> _unpublishedLanguages(TranslationsState state) => [
+    for (final lang in widget.languages)
+      if (state.unpublishedKeys[lang]?.contains(_info.name) ?? false) lang,
+  ];
+
+  void _discard(List<String> languages) {
+    context.read<TranslationsBloc>().add(
+      DraftsDiscardRequested({
+        for (final lang in languages) lang: [_info.name],
+      }),
+    );
+  }
+
+  /// Closes after a save or discard. Save failures stay in the dialog;
+  /// discard failures are shown by the edit overlay.
   void _onOutcome(BuildContext context, TranslationsState state) {
     final outcome = state.outcome!;
     final failure = outcome.failure;
@@ -111,6 +127,7 @@ class _EditKeyDialogState extends State<EditKeyDialog> {
       Navigator.pop(context);
       return;
     }
+    if (outcome.operation != TranslationsOperation.save) return;
     setState(() {
       _language = outcome.languageCode ?? _language;
       _saveError = failure.message;
@@ -123,11 +140,13 @@ class _EditKeyDialogState extends State<EditKeyDialog> {
     return BlocConsumer<TranslationsBloc, TranslationsState>(
       listenWhen: (previous, current) =>
           previous.outcome != current.outcome &&
-          current.outcome?.operation == TranslationsOperation.save,
+          (current.outcome?.operation == TranslationsOperation.save ||
+              current.outcome?.operation == TranslationsOperation.discard),
       listener: _onOutcome,
       builder: (context, state) {
-        final saving = state.busy == TranslationsOperation.save;
+        final saving = state.isBusy;
         final changed = _changedLanguages(state);
+        final unpublished = _unpublishedLanguages(state);
         final invalid = changed.where((lang) => _errorFor(lang) != null);
         final controller = _controllers[_language]!;
         final error = _saveError ?? _errorFor(_language);
@@ -231,6 +250,19 @@ class _EditKeyDialogState extends State<EditKeyDialog> {
             ),
           ),
           actions: [
+            if (unpublished.isNotEmpty)
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.colorScheme.error,
+                ),
+                onPressed: saving ? null : () => _discard(unpublished),
+                child: Text(
+                  unpublished.length > 1
+                      ? 'Discard ${unpublished.length} drafts'
+                      : 'Discard draft '
+                            '(${unpublished.single.toUpperCase()})',
+                ),
+              ),
             TextButton(
               onPressed: saving ? null : () => Navigator.pop(context),
               child: const Text('Cancel'),

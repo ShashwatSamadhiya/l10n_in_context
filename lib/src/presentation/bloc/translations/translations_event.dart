@@ -48,6 +48,19 @@ final class BundledImportRequested extends TranslationsEvent {
   const BundledImportRequested();
 }
 
+/// Discards the drafts of [keys] (`languageCode -> keys`), so editors see
+/// the published (or bundled) text again.
+final class DraftsDiscardRequested extends TranslationsEvent {
+  /// Creates the event.
+  const DraftsDiscardRequested(this.keys);
+
+  /// Keys to discard per language.
+  final Map<String, List<String>> keys;
+
+  @override
+  List<Object?> get props => [keys];
+}
+
 /// Publishes every unpublished draft.
 final class PublishRequested extends TranslationsEvent {
   /// Creates the event.

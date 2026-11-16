@@ -7,6 +7,7 @@ import '../../data/repositories/editor_access_repository_impl.dart';
 import '../../data/repositories/translation_repository_impl.dart';
 import '../../domain/entities/messages_by_language.dart';
 import '../../domain/entities/translation_snapshot.dart';
+import '../../domain/usecases/discard_drafts.dart';
 import '../../domain/usecases/import_bundled.dart';
 import '../../domain/usecases/publish_drafts.dart';
 import '../../domain/usecases/save_draft.dart';
@@ -216,6 +217,7 @@ class _EditorBlocs {
         watchPublished: WatchPublished(translations),
         saveDraft: SaveDraft(translations, catalog),
         importBundled: ImportBundled(translations, catalog),
+        discardDrafts: DiscardDrafts(translations),
         publishDrafts: PublishDrafts(translations, catalog),
       ),
       EditorToolsCubit(),

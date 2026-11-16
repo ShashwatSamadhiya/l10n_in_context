@@ -63,6 +63,17 @@ class InMemoryL10nTranslationDataSource implements L10nTranslationDataSource {
   }
 
   @override
+  Future<void> discardDrafts({
+    required EditorUser editor,
+    required Map<String, List<String>> keys,
+  }) async {
+    for (final MapEntry(key: lang, value: names) in keys.entries) {
+      _drafts[lang]?.removeWhere((key, _) => names.contains(key));
+    }
+    _changes.add(null);
+  }
+
+  @override
   Future<void> publish({
     required EditorUser editor,
     required MessagesByLanguage messages,

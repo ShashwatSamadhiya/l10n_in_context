@@ -5,6 +5,7 @@ import '../../domain/entities/l10n_catalog.dart';
 import '../bloc/translations/translations_bloc.dart';
 import '../widgets/edit_key_dialog.dart';
 import '../widgets/editor_config.dart';
+import '../widgets/export_arb_dialog.dart';
 import '../widgets/spacing.dart';
 
 enum _Filter {
@@ -16,8 +17,14 @@ enum _Filter {
   final String label;
 }
 
+enum _MenuAction { export, discard }
+
+/// `1 draft`, `2 unpublished drafts`.
+String _drafts(int count, [String adjective = '']) =>
+    '$count $adjective${count == 1 ? 'draft' : 'drafts'}';
+
 /// Every catalog key in every language, including keys that never appear on
-/// the current screen. Also hosts Import and Publish.
+/// the current screen. Also hosts Import, Export, Discard and Publish.
 class L10nKeyTablePage extends StatefulWidget {
   /// Creates the page.
   const L10nKeyTablePage({super.key});
@@ -117,6 +124,25 @@ class _L10nKeyTablePageState extends State<L10nKeyTablePage> {
     if (confirmed) bloc.add(const PublishRequested());
   }
 
+  Future<void> _discardAll(TranslationsBloc bloc) async {
+    final unpublished = bloc.state.unpublishedKeys;
+    final count = bloc.state.unpublishedCount;
+    final confirmed = await _confirm(
+      title: 'Discard ${_drafts(count, 'unpublished ')}?',
+      body: [
+        const Text(
+          'Deletes these drafts. Editors see the published text again, or '
+          'the bundled text where nothing is published.',
+        ),
+        gapSm,
+        for (final MapEntry(key: lang, value: keys) in unpublished.entries)
+          Text('${lang.toUpperCase()} · ${keys.join(', ')}'),
+      ],
+      action: 'Discard',
+    );
+    if (confirmed) bloc.add(DraftsDiscardRequested(unpublished));
+  }
+
   Future<bool> _confirm({
     required String title,
     required List<Widget> body,
@@ -156,6 +182,7 @@ class _L10nKeyTablePageState extends State<L10nKeyTablePage> {
     final outcome = state.outcome!;
     final message = switch (outcome.operation) {
       TranslationsOperation.import => 'Imported ${outcome.count} messages.',
+      TranslationsOperation.discard => 'Discarded ${_drafts(outcome.count)}.',
       TranslationsOperation.publish => 'Published.',
       TranslationsOperation.save || TranslationsOperation.sync => null,
     };
@@ -187,6 +214,24 @@ class _L10nKeyTablePageState extends State<L10nKeyTablePage> {
                 tooltip: 'Import bundled ARB',
                 onPressed: state.isBusy ? null : () => _import(bloc),
                 icon: const Icon(Icons.download_outlined),
+              ),
+              PopupMenuButton<_MenuAction>(
+                tooltip: 'More',
+                onSelected: (action) => switch (action) {
+                  _MenuAction.export => showExportArbDialog(context),
+                  _MenuAction.discard => _discardAll(bloc),
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: _MenuAction.export,
+                    child: Text('Export ARB…'),
+                  ),
+                  PopupMenuItem(
+                    value: _MenuAction.discard,
+                    enabled: !state.isBusy && unpublished > 0,
+                    child: const Text('Discard unpublished drafts…'),
+                  ),
+                ],
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),

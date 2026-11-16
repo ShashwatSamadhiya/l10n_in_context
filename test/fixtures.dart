@@ -175,6 +175,19 @@ class FailingTranslationDataSource extends InMemoryL10nTranslationDataSource {
     );
   }
 
+  /// Every successful discard.
+  final List<Map<String, List<String>>> discards = [];
+
+  @override
+  Future<void> discardDrafts({
+    required EditorUser editor,
+    required Map<String, List<String>> keys,
+  }) async {
+    if (failWith case final error?) throw error;
+    discards.add(keys);
+    return super.discardDrafts(editor: editor, keys: keys);
+  }
+
   @override
   Future<void> publish({
     required EditorUser editor,

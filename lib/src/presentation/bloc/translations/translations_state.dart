@@ -8,6 +8,9 @@ enum TranslationsOperation {
   /// Importing bundled text into the drafts.
   import,
 
+  /// Discarding drafts.
+  discard,
+
   /// Publishing drafts.
   publish,
 
@@ -39,7 +42,7 @@ class TranslationsOutcome extends Equatable {
   /// The language a save failed for.
   final String? languageCode;
 
-  /// Messages saved, imported or published.
+  /// Messages saved, imported, discarded or published.
   final int count;
 
   /// True when [operation] succeeded.
@@ -79,7 +82,7 @@ class TranslationsState extends Equatable {
   /// The last finished operation.
   final TranslationsOutcome? outcome;
 
-  /// True while a save, import or publish is in progress.
+  /// True while a save, import, discard or publish is in progress.
   bool get isBusy => busy != null;
 
   /// Number of unpublished messages across every language.

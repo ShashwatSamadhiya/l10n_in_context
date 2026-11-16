@@ -101,6 +101,8 @@ class MyTranslationDataSource implements L10nTranslationDataSource {
   @override
   Future<void> importDrafts({...}) => ...;
   @override
+  Future<void> discardDrafts({...}) => ...;
+  @override
   Future<void> publish({...}) => ...;
 }
 ```
@@ -198,6 +200,20 @@ class FirestoreTranslationDataSource implements L10nTranslationDataSource {
   });
 
   @override
+  Future<void> discardDrafts({
+    required EditorUser editor,
+    required Map<String, List<String>> keys,
+  }) => _guard(() {
+    final batch = _db.batch();
+    keys.forEach((lang, names) {
+      batch.set(_drafts.doc(lang), {
+        for (final name in names) name: FieldValue.delete(),
+      }, SetOptions(merge: true));
+    });
+    return batch.commit();
+  });
+
+  @override
   Future<void> publish({
     required EditorUser editor,
     required MessagesByLanguage messages,
@@ -285,6 +301,42 @@ AppLocalizationsOverrideDelegate(messages: {'hi': fetchedHindiMessages})
 ```
 
 In edit mode the editor layers its drafts and published messages on top.
+
+## Bringing edits back into the ARB files
+
+Over-the-air strings live in your backend. To make them the bundled text of
+the next release, copy them back into the project:
+
+1. In the editor, open **All keys**, then **⋮ → Export ARB…**. Choose
+   **Published** or **Drafts** and tap **Copy all languages**. Only strings
+   that differ from the bundled ARB are copied, in one block for every
+   language. (Each language also has its own **Copy** button.)
+2. Paste it into a file in the app's root, such as `l10n_changes.json`, and
+   merge it. Each language goes into the ARB file with the same `@@locale`:
+
+   ```bash
+   dart run l10n_in_context:merge l10n_changes.json   # or: pbpaste | dart run l10n_in_context:merge -
+   flutter gen-l10n
+   dart run l10n_in_context:generate
+   ```
+
+   Delete `l10n_changes.json` afterwards; it isn't needed once merged.
+
+The merge rewrites only the changed messages, so key order, metadata and
+formatting stay as they are. `--dry-run` prints what would change. Keys
+that aren't in the template ARB are rejected.
+
+To export from your own code instead, for example to save a file or open a
+pull request, use `ArbExport(appLocalizationsCatalog)`: `changes(messages)`
+picks the edited messages, `arbs(changes)` writes every language in the
+format `merge` reads, and `arb(languageCode, messages)` writes one ARB.
+
+## Discarding drafts
+
+In the edit dialog, **Discard draft** deletes a key's unpublished drafts, so
+the editor sees the published text again (or the bundled text, where nothing
+is published). **⋮ → Discard unpublished drafts…** in the key table discards
+all of them.
 
 ## Leaving the editor out of release builds
 

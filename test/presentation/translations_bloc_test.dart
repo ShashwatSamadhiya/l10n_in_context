@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:l10n_in_context/l10n_in_context.dart';
 import 'package:l10n_in_context/src/data/repositories/translation_repository_impl.dart';
+import 'package:l10n_in_context/src/domain/usecases/discard_drafts.dart';
 import 'package:l10n_in_context/src/domain/usecases/import_bundled.dart';
 import 'package:l10n_in_context/src/domain/usecases/publish_drafts.dart';
 import 'package:l10n_in_context/src/domain/usecases/save_draft.dart';
@@ -27,6 +28,7 @@ void main() {
       watchPublished: WatchPublished(repository),
       saveDraft: SaveDraft(repository, testCatalog),
       importBundled: ImportBundled(repository, testCatalog),
+      discardDrafts: DiscardDrafts(repository),
       publishDrafts: PublishDrafts(repository, testCatalog),
     );
   }
@@ -167,6 +169,77 @@ void main() {
     expect(dataSource.drafts['en']!.containsKey('retry'), isFalse);
     expect(dataSource.drafts['hi']!.length, overridable);
     expect(bloc.state.missingFromBundledCount, 0);
+  });
+
+  group('discard', () {
+    test(
+      'deletes only drafts that exist, back to the published text',
+      () async {
+        build(
+          drafts: {
+            'en': {'retry': 'Try again', 'getStarted': 'Go'},
+            'hi': {'retry': 'फिर से'},
+          },
+          published: {
+            'en': {'retry': 'Retry'},
+          },
+        );
+        await subscribe();
+        final outcome = await run(
+          const DraftsDiscardRequested({
+            'en': ['retry', 'welcomeTitle'],
+            'hi': ['getStarted'],
+          }),
+        );
+        expect(outcome.isSuccess, isTrue);
+        expect(outcome.count, 1);
+        expect(dataSource.discards, [
+          {
+            'en': ['retry'],
+          },
+        ]);
+        expect(dataSource.drafts, {
+          'en': {'getStarted': 'Go'},
+          'hi': {'retry': 'फिर से'},
+        });
+        expect(bloc.state.snapshot.effectiveDraft('en')['retry'], 'Retry');
+        expect(bloc.state.unpublishedKeys, {
+          'en': ['getStarted'],
+          'hi': ['retry'],
+        });
+      },
+    );
+
+    test('writes nothing when no draft matches', () async {
+      build();
+      await subscribe();
+      final outcome = await run(
+        const DraftsDiscardRequested({
+          'en': ['retry'],
+        }),
+      );
+      expect(outcome.isSuccess, isTrue);
+      expect(outcome.count, 0);
+      expect(dataSource.discards, isEmpty);
+    });
+
+    test('reports the data source error', () async {
+      build(
+        drafts: {
+          'en': {'retry': 'Again'},
+        },
+      );
+      await subscribe();
+      dataSource.failWith = const L10nDataSourceException('Denied');
+      final outcome = await run(
+        const DraftsDiscardRequested({
+          'en': ['retry'],
+        }),
+      );
+      expect(outcome.operation, TranslationsOperation.discard);
+      expect(outcome.failure, const DataSourceFailure('Denied'));
+      expect(bloc.state.snapshot.drafts['en'], {'retry': 'Again'});
+    });
   });
 
   test('unsubscribing forgets every message', () async {

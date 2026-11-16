@@ -1,3 +1,18 @@
+## 0.2.0
+
+- **Export to ARB**: the key table's **Export ARB…** copies the published or
+  draft messages that differ from the bundled ARB, for every language at
+  once or for one. `dart run l10n_in_context:merge <file>` writes them into
+  the project's ARB files, changing only those messages. `ArbExport` does
+  the same from code.
+- **Discard drafts**: discard a key's unpublished drafts from the edit
+  dialog, or every unpublished draft from the key table.
+- **Breaking**: `L10nTranslationDataSource` has a new method,
+  `discardDrafts({editor, keys})`, which deletes the given drafts
+  (`languageCode -> keys`). Custom data sources must implement it; see the
+  README for a Firestore version. `TranslationsOperation` has a new
+  `discard` value.
+
 ## 0.1.2
 
 - Shorten the package description to pub.dev's 180-character limit.

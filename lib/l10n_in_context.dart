@@ -18,6 +18,7 @@ export 'src/domain/entities/editor_user.dart';
 export 'src/domain/entities/l10n_catalog.dart';
 export 'src/domain/entities/messages_by_language.dart';
 export 'src/domain/entities/translation_snapshot.dart';
+export 'src/domain/usecases/export_arb.dart';
 export 'src/domain/usecases/validate_message.dart';
 export 'src/presentation/bloc/editor_session/editor_session_bloc.dart';
 export 'src/presentation/bloc/editor_tools/editor_tools_cubit.dart';

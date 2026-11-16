@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:l10n_in_context/l10n_in_context.dart';
 
@@ -122,5 +125,96 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Retry'), findsOneWidget);
     expect(find.byTooltip('Pick a text'), findsNothing);
+  });
+
+  Future<void> openKeyTable(WidgetTester tester) async {
+    await tester.pumpWidget(app());
+    await tester.pump();
+    access.grant(testEditor);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('All keys'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('the edit dialog discards an unpublished draft', (tester) async {
+    await openKeyTable(tester);
+    await tester.tap(find.text('retry'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Discard draft (EN)'));
+    await tester.pumpAndSettle();
+
+    expect(translations.drafts['en'], isEmpty);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Discarded 1 draft.'), findsOneWidget);
+
+    // Nothing left to discard.
+    await tester.tap(find.text('retry'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Discard draft'), findsNothing);
+  });
+
+  testWidgets('the key table discards every unpublished draft', (tester) async {
+    await openKeyTable(tester);
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard unpublished drafts…'));
+    await tester.pumpAndSettle();
+    expect(find.text('Discard 1 unpublished draft?'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Discard'));
+    await tester.pumpAndSettle();
+    expect(translations.drafts['en'], isEmpty);
+  });
+
+  testWidgets('export copies the changed messages as ARB', (tester) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await openKeyTable(tester);
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Export ARB…'));
+    await tester.pumpAndSettle();
+
+    // Published: only welcomeTitle differs from bundled.
+    expect(find.text('1 changed message'), findsOneWidget);
+    expect(find.text('Same as bundled'), findsOneWidget);
+    await tester.tap(find.text('Copy').first);
+    await tester.pumpAndSettle();
+    expect(jsonDecode(copied!), {'@@locale': 'en', 'welcomeTitle': 'Hello'});
+
+    // Drafts add the unpublished retry.
+    await tester.tap(find.text('Drafts'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy').first);
+    await tester.pumpAndSettle();
+    expect(jsonDecode(copied!), {
+      '@@locale': 'en',
+      'welcomeTitle': 'Hello',
+      'retry': 'Try again',
+    });
+
+    // Copy all: every language with changes, as a list.
+    await tester.tap(find.text('Copy all languages (2)'));
+    await tester.pumpAndSettle();
+    expect(jsonDecode(copied!), [
+      {'@@locale': 'en', 'welcomeTitle': 'Hello', 'retry': 'Try again'},
+    ]);
+    expect(find.textContaining('Copied every language.'), findsOneWidget);
   });
 }

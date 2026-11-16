@@ -48,6 +48,12 @@ class TranslationRepositoryImpl implements TranslationRepository {
   );
 
   @override
+  Future<Either<L10nFailure, Unit>> discardDrafts({
+    required EditorUser editor,
+    required Map<String, List<String>> keys,
+  }) => _write(() => _dataSource.discardDrafts(editor: editor, keys: keys));
+
+  @override
   Future<Either<L10nFailure, Unit>> publish({
     required EditorUser editor,
     required MessagesByLanguage messages,

@@ -38,6 +38,14 @@ abstract interface class L10nTranslationDataSource {
     required MessagesByLanguage messages,
   });
 
+  /// Deletes the drafts of [keys] (`languageCode -> keys`), keeping every
+  /// other draft. The editor then sees the published text again. Keys
+  /// without a draft are ignored.
+  Future<void> discardDrafts({
+    required EditorUser editor,
+    required Map<String, List<String>> keys,
+  });
+
   /// Replaces the published messages of each language in [messages] with
   /// exactly those messages. Languages not in [messages] are left alone.
   ///

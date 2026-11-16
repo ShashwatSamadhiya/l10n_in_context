@@ -9,6 +9,7 @@ import '../../../domain/entities/editor_user.dart';
 import '../../../domain/entities/l10n_catalog.dart';
 import '../../../domain/entities/messages_by_language.dart';
 import '../../../domain/entities/translation_snapshot.dart';
+import '../../../domain/usecases/discard_drafts.dart';
 import '../../../domain/usecases/import_bundled.dart';
 import '../../../domain/usecases/publish_drafts.dart';
 import '../../../domain/usecases/save_draft.dart';
@@ -27,12 +28,14 @@ class TranslationsBloc extends Bloc<TranslationsEvent, TranslationsState> {
     required WatchPublished watchPublished,
     required SaveDraft saveDraft,
     required ImportBundled importBundled,
+    required DiscardDrafts discardDrafts,
     required PublishDrafts publishDrafts,
   }) : _catalog = catalog,
        _watchDrafts = watchDrafts,
        _watchPublished = watchPublished,
        _saveDraft = saveDraft,
        _importBundled = importBundled,
+       _discardDrafts = discardDrafts,
        _publishDrafts = publishDrafts,
        super(const TranslationsState()) {
     on<TranslationsSubscriptionRequested>(_onSubscriptionRequested);
@@ -41,6 +44,7 @@ class TranslationsBloc extends Bloc<TranslationsEvent, TranslationsState> {
     on<_PublishedReceived>(_onPublishedReceived);
     on<DraftsSaveRequested>(_onSaveRequested);
     on<BundledImportRequested>(_onImportRequested);
+    on<DraftsDiscardRequested>(_onDiscardRequested);
     on<PublishRequested>(_onPublishRequested);
   }
 
@@ -49,6 +53,7 @@ class TranslationsBloc extends Bloc<TranslationsEvent, TranslationsState> {
   final WatchPublished _watchPublished;
   final SaveDraft _saveDraft;
   final ImportBundled _importBundled;
+  final DiscardDrafts _discardDrafts;
   final PublishDrafts _publishDrafts;
 
   final List<StreamSubscription<Object?>> _subscriptions = [];
@@ -133,6 +138,19 @@ class TranslationsBloc extends Bloc<TranslationsEvent, TranslationsState> {
     TranslationsOperation.import,
     emit,
     (user) => _importBundled(editor: user, snapshot: state.snapshot),
+  );
+
+  Future<void> _onDiscardRequested(
+    DraftsDiscardRequested event,
+    Emitter<TranslationsState> emit,
+  ) => _runBulk(
+    TranslationsOperation.discard,
+    emit,
+    (user) => _discardDrafts(
+      editor: user,
+      snapshot: state.snapshot,
+      keys: event.keys,
+    ),
   );
 
   Future<void> _onPublishRequested(

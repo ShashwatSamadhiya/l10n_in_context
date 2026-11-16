@@ -27,6 +27,12 @@ abstract interface class TranslationRepository {
     required MessagesByLanguage messages,
   });
 
+  /// Deletes the drafts of [keys] (`languageCode -> keys`).
+  Future<Either<L10nFailure, Unit>> discardDrafts({
+    required EditorUser editor,
+    required Map<String, List<String>> keys,
+  });
+
   /// Replaces the published messages of each language in [messages].
   Future<Either<L10nFailure, Unit>> publish({
     required EditorUser editor,
