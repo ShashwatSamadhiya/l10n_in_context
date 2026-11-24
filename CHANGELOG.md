@@ -5,6 +5,10 @@
 - The highlight outlines and the editor toolbar no longer show on top of
   dialogs: text covered by a dialog isn't outlined, and the toolbar is
   hidden while the dialogs opened by picking a text are showing.
+- Tapping **All keys** while the key table is open no longer opens another
+  copy of it. The button shows as selected while the table is open.
+- The editor toolbar, and the Edit button, can be dragged anywhere on
+  screen when they cover something. They stay inside the screen.
 
 ## 0.2.0
 

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -40,6 +42,10 @@ class _L10nEditOverlayState extends State<L10nEditOverlay>
 
   /// A dialog opened by picking a text is showing.
   bool _dialogOpen = false;
+
+  /// How far the toolbar (or Edit button) was dragged from the bottom-right
+  /// corner. Kept here so it stays put while it is hidden or swapped.
+  Offset _toolbarOffset = Offset.zero;
 
   EditorConfig get _config => context.read<EditorConfig>();
 
@@ -157,10 +163,21 @@ class _L10nEditOverlayState extends State<L10nEditOverlay>
     request(navigatorContext);
   }
 
-  void _openKeyTable() {
-    _navigator?.push(
-      MaterialPageRoute<void>(builder: (_) => const L10nKeyTablePage()),
-    );
+  /// The key table is open. The toolbar stays on top of it, so another tap
+  /// on All keys must not push a second copy.
+  bool _keyTableOpen = false;
+
+  Future<void> _openKeyTable() async {
+    final navigator = _navigator;
+    if (_keyTableOpen || navigator == null) return;
+    setState(() => _keyTableOpen = true);
+    try {
+      await navigator.push(
+        MaterialPageRoute<void>(builder: (_) => const L10nKeyTablePage()),
+      );
+    } finally {
+      if (mounted) setState(() => _keyTableOpen = false);
+    }
   }
 
   void _showError(String message) {
@@ -227,32 +244,36 @@ class _L10nEditOverlayState extends State<L10nEditOverlay>
                   ),
                 if (!_dialogOpen &&
                     (isEditor || config.onRequestAccess != null))
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
+                  Positioned.fill(
                     child: SafeArea(
                       child: Padding(
                         padding: paddingMd,
-                        child: isEditor
-                            ? _EditorToolbar(
-                                label: config.label,
-                                tools: tools,
-                                unpublished: unpublished,
-                                onPick: cubit.togglePickMode,
-                                onHighlight: cubit.toggleHighlight,
-                                onKeys: _openKeyTable,
-                                onSignOut: config.onSignOut,
-                              )
-                            : FloatingActionButton.small(
-                                heroTag: null,
-                                tooltip: 'Edit translations',
-                                onPressed:
-                                    session.status ==
-                                        EditorSessionStatus.checking
-                                    ? null
-                                    : _requestAccess,
-                                child: const Icon(Icons.edit_note),
-                              ),
+                        child: _Movable(
+                          fromCorner: _toolbarOffset,
+                          onMoved: (offset) =>
+                              setState(() => _toolbarOffset = offset),
+                          child: isEditor
+                              ? _EditorToolbar(
+                                  label: config.label,
+                                  tools: tools,
+                                  unpublished: unpublished,
+                                  onPick: cubit.togglePickMode,
+                                  onHighlight: cubit.toggleHighlight,
+                                  keysOpen: _keyTableOpen,
+                                  onKeys: _openKeyTable,
+                                  onSignOut: config.onSignOut,
+                                )
+                              : FloatingActionButton.small(
+                                  heroTag: null,
+                                  tooltip: 'Edit translations',
+                                  onPressed:
+                                      session.status ==
+                                          EditorSessionStatus.checking
+                                      ? null
+                                      : _requestAccess,
+                                  child: const Icon(Icons.edit_note),
+                                ),
+                        ),
                       ),
                     ),
                   ),
@@ -265,6 +286,89 @@ class _L10nEditOverlayState extends State<L10nEditOverlay>
   }
 }
 
+/// Places [child] [fromCorner] away from the bottom-right corner of the
+/// available space, and lets it be dragged anywhere inside that space.
+///
+/// Taps still reach [child]: a drag only starts once the pointer moves.
+class _Movable extends StatefulWidget {
+  const _Movable({
+    required this.fromCorner,
+    required this.onMoved,
+    required this.child,
+  });
+
+  /// Distance from the right (dx) and bottom (dy) edges.
+  final Offset fromCorner;
+  final ValueChanged<Offset> onMoved;
+  final Widget child;
+
+  @override
+  State<_Movable> createState() => _MovableState();
+}
+
+class _MovableState extends State<_Movable> {
+  final GlobalKey _childKey = GlobalKey();
+
+  /// The offset during a drag.
+  Offset? _dragged;
+
+  Size get _childSize {
+    final box = _childKey.currentContext?.findRenderObject() as RenderBox?;
+    return box != null && box.hasSize ? box.size : Size.zero;
+  }
+
+  /// [offset] kept inside [bounds], so the child can't leave the screen,
+  /// also after a rotation or a resize.
+  Offset _clamp(Offset offset, Size bounds) {
+    final child = _childSize;
+    return Offset(
+      offset.dx.clamp(0, math.max(0, bounds.width - child.width)),
+      offset.dy.clamp(0, math.max(0, bounds.height - child.height)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bounds = constraints.biggest;
+        final offset = _clamp(widget.fromCorner, bounds);
+        // A Stack without a background only takes the hits its children
+        // take, so the app below stays usable.
+        return Stack(
+          children: [
+            Positioned(
+              right: offset.dx,
+              bottom: offset.dy,
+              child: GestureDetector(
+                key: _childKey,
+                onPanStart: (_) => _dragged = offset,
+                onPanUpdate: (details) {
+                  // Kept here as well: several updates can arrive before
+                  // the parent rebuilds with the new offset.
+                  final moved = _clamp(
+                    (_dragged ?? offset) -
+                        Offset(details.delta.dx, details.delta.dy),
+                    bounds,
+                  );
+                  _dragged = moved;
+                  widget.onMoved(moved);
+                },
+                onPanEnd: (_) => _dragged = null,
+                onPanCancel: () => _dragged = null,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.move,
+                  child: widget.child,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _EditorToolbar extends StatelessWidget {
   const _EditorToolbar({
     required this.label,
@@ -272,6 +376,7 @@ class _EditorToolbar extends StatelessWidget {
     required this.unpublished,
     required this.onPick,
     required this.onHighlight,
+    required this.keysOpen,
     required this.onKeys,
     required this.onSignOut,
   });
@@ -281,6 +386,7 @@ class _EditorToolbar extends StatelessWidget {
   final int unpublished;
   final VoidCallback onPick;
   final VoidCallback onHighlight;
+  final bool keysOpen;
   final VoidCallback onKeys;
   final Future<void> Function()? onSignOut;
 
@@ -313,6 +419,12 @@ class _EditorToolbar extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // The whole toolbar can be dragged; this shows that it can.
+                Icon(
+                  Icons.drag_indicator,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 IconButton(
                   tooltip: 'Pick a text',
                   isSelected: tools.pickMode,
@@ -327,6 +439,7 @@ class _EditorToolbar extends StatelessWidget {
                 ),
                 IconButton(
                   tooltip: 'All keys',
+                  isSelected: keysOpen,
                   onPressed: onKeys,
                   icon: Badge(
                     isLabelVisible: unpublished > 0,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:l10n_in_context/l10n_in_context.dart';
+import 'package:l10n_in_context/src/presentation/pages/l10n_key_table_page.dart';
 
 import '../fixtures.dart';
 
@@ -146,6 +147,52 @@ void main() {
     await tester.tap(find.byTooltip('All keys'));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('the toolbar can be dragged but not off screen', (tester) async {
+    await tester.pumpWidget(app());
+    await tester.pump();
+    access.grant(testEditor);
+    await tester.pumpAndSettle();
+
+    final handle = find.byIcon(Icons.drag_indicator);
+    final start = tester.getCenter(handle);
+    await tester.drag(handle, const Offset(-200, -150));
+    await tester.pumpAndSettle();
+    expect(tester.getCenter(handle), start + const Offset(-200, -150));
+
+    // Its buttons still work after the move.
+    await tester.tap(find.byTooltip('Pick a text'));
+    await tester.pump();
+    expect(find.text('Tap a text to edit it'), findsOneWidget);
+    await tester.tap(find.byTooltip('Pick a text'));
+    await tester.pump();
+
+    await tester.drag(handle, const Offset(-5000, -5000));
+    await tester.pumpAndSettle();
+    final screen =
+        Offset.zero & tester.view.physicalSize / tester.view.devicePixelRatio;
+    final toolbar = tester.getRect(
+      find.ancestor(of: handle, matching: find.byType(Material)).first,
+    );
+    expect(screen.contains(toolbar.topLeft), isTrue);
+    expect(screen.contains(toolbar.bottomRight), isTrue);
+  });
+
+  testWidgets('All keys opens the key table only once', (tester) async {
+    await openKeyTable(tester);
+    await tester.tap(find.byTooltip('All keys'));
+    await tester.pumpAndSettle();
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(L10nKeyTablePage), findsNothing);
+    expect(textStartingWith('Try again'), findsOneWidget);
+
+    // It opens again once closed.
+    await tester.tap(find.byTooltip('All keys'));
+    await tester.pumpAndSettle();
+    expect(find.byType(L10nKeyTablePage), findsOneWidget);
+  });
 
   testWidgets('the edit dialog discards an unpublished draft', (tester) async {
     await openKeyTable(tester);
