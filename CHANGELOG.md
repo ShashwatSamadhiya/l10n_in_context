@@ -1,3 +1,11 @@
+## 0.2.1
+
+- Pick mode stays on after editing a picked text, so the next text can be
+  picked straight away. Tap **Pick a text** again to leave it.
+- The highlight outlines and the editor toolbar no longer show on top of
+  dialogs: text covered by a dialog isn't outlined, and the toolbar is
+  hidden while the dialogs opened by picking a text are showing.
+
 ## 0.2.0
 
 - **Export to ARB**: the key table's **Export ARB…** copies the published or
