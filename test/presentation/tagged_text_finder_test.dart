@@ -77,6 +77,37 @@ void main() {
     );
   });
 
+  testWidgets('uncoveredOnly leaves out text under a dialog', (tester) async {
+    await pump(
+      tester,
+      Scaffold(
+        body: Column(
+          children: [
+            Text(_tag('welcomeTitle', 'Home')),
+            IgnorePointer(child: Text(_tag('getStarted', 'Go'))),
+          ],
+        ),
+      ),
+    );
+    List<String> uncovered() => findTaggedTexts(
+      testCatalog,
+      root(tester),
+      uncoveredOnly: true,
+    ).expand((t) => t.keys).toList();
+
+    // Text under IgnorePointer isn't covered by anything.
+    expect(uncovered(), ['welcomeTitle', 'getStarted']);
+
+    showDialog<void>(
+      context: navigatorKey.currentContext!,
+      builder: (_) => AlertDialog(content: Text(_tag('retry', 'Retry'))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(uncovered(), ['retry']);
+    expect(findTaggedTexts(testCatalog, root(tester)), hasLength(3));
+  });
+
   test('ignores indexes outside the catalog', () {
     expect(
       keysIn(testCatalog, 'x${KeyTagCodec.encode(testCatalog.keys.length)}'),

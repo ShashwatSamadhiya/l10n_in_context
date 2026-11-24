@@ -50,7 +50,15 @@ List<String> keysAt(
 ///
 /// Walks the tree the way semantics does, which skips offstage children such
 /// as the routes below an opaque page, so their text isn't reported.
-List<TaggedText> findTaggedTexts(L10nCatalog catalog, RenderObject root) {
+///
+/// With [uncoveredOnly], texts covered by something drawn over them, such as
+/// a dialog and its barrier, are left out too; [root] must then be a
+/// [RenderBox].
+List<TaggedText> findTaggedTexts(
+  L10nCatalog catalog,
+  RenderObject root, {
+  bool uncoveredOnly = false,
+}) {
   final found = <TaggedText>[];
   void visit(RenderObject node) {
     if (node is RenderBox && node.hasSize) {
@@ -58,15 +66,13 @@ List<TaggedText> findTaggedTexts(L10nCatalog catalog, RenderObject root) {
       if (text != null) {
         final keys = keysIn(catalog, text);
         if (keys.isNotEmpty) {
-          found.add(
-            TaggedText(
-              MatrixUtils.transformRect(
-                node.getTransformTo(root),
-                Offset.zero & node.size,
-              ),
-              keys,
-            ),
+          final rect = MatrixUtils.transformRect(
+            node.getTransformTo(root),
+            Offset.zero & node.size,
           );
+          if (!uncoveredOnly || !_isCovered(root as RenderBox, node, rect)) {
+            found.add(TaggedText(rect, keys));
+          }
         }
       }
     }
@@ -75,6 +81,25 @@ List<TaggedText> findTaggedTexts(L10nCatalog catalog, RenderObject root) {
 
   visit(root);
   return found;
+}
+
+/// Whether a hit test at the center of [node] (at [rect] in [root]) lands
+/// first on something that is neither [node] nor one of its ancestors. Text
+/// under `IgnorePointer` isn't covered: the hit lands on an ancestor.
+bool _isCovered(RenderBox root, RenderObject node, Rect rect) {
+  final result = BoxHitTestResult();
+  root.hitTest(result, position: rect.center);
+  // The deepest render object hit; text spans may come before it.
+  final top = result.path
+      .map((entry) => entry.target)
+      .whereType<RenderObject>()
+      .firstOrNull;
+  if (top == null) return false;
+  for (RenderObject? n = node; n != null; n = n.parent) {
+    if (identical(n, top)) return false;
+    if (identical(n, root)) break;
+  }
+  return true;
 }
 
 String? _textOf(HitTestTarget target) => switch (target) {

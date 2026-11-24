@@ -111,6 +111,8 @@ void main() {
     await tester.tapAt(tester.getCenter(textStartingWith('Try again')));
     await tester.pumpAndSettle();
     expect(find.text('retry'), findsOneWidget);
+    // The toolbar would be drawn on top of the dialog.
+    expect(find.byTooltip('Pick a text'), findsNothing);
 
     await tester.enterText(find.byType(TextField), 'Once more');
     await tester.pump();
@@ -120,6 +122,15 @@ void main() {
     expect(translations.drafts['en']!['retry'], 'Once more');
     expect(textStartingWith('Once more'), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
+
+    // Pick mode is still on, so the next text can be picked straight away.
+    expect(find.text('Tap a text to edit it'), findsOneWidget);
+    await tester.tapAt(tester.getCenter(textStartingWith('Hello')));
+    await tester.pumpAndSettle();
+    expect(find.text('welcomeTitle'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tap a text to edit it'), findsOneWidget);
 
     access.revoke();
     await tester.pumpAndSettle();

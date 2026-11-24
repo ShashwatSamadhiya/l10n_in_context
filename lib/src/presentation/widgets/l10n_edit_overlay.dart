@@ -38,6 +38,9 @@ class _L10nEditOverlayState extends State<L10nEditOverlay>
   late final Ticker _ticker = createTicker((_) => _updateHighlights());
   List<Rect> _highlights = const [];
 
+  /// A dialog opened by picking a text is showing.
+  bool _dialogOpen = false;
+
   EditorConfig get _config => context.read<EditorConfig>();
 
   RenderBox? get _contentBox =>
@@ -84,13 +87,21 @@ class _L10nEditOverlayState extends State<L10nEditOverlay>
     final box = _contentBox;
     if (box == null || !box.hasSize) return;
     final rects = [
-      for (final tagged in findTaggedTexts(_config.catalog, box)) tagged.rect,
+      // Texts under a dialog aren't outlined: the outlines are drawn above
+      // the app's Navigator, so they would show on top of the dialog.
+      for (final tagged in findTaggedTexts(
+        _config.catalog,
+        box,
+        uncoveredOnly: true,
+      ))
+        tagged.rect,
     ];
     if (!listEquals(rects, _highlights)) setState(() => _highlights = rects);
   }
 
+  /// Pick mode stays on across picks: its layer is lifted while the dialogs
+  /// are open, so they get the taps, and put back once they close.
   Future<void> _pick(Offset globalPosition) async {
-    context.read<EditorToolsCubit>().setPickMode(false);
     final box = _contentBox;
     final navigatorContext = _navigator?.context;
     if (box == null || navigatorContext == null) return;
@@ -101,6 +112,25 @@ class _L10nEditOverlayState extends State<L10nEditOverlay>
       );
       return;
     }
+    final tools = context.read<EditorToolsCubit>()..setPickMode(false);
+    // The toolbar is drawn above the app's Navigator, so it is hidden
+    // while the dialogs are open instead of showing on top of them.
+    setState(() => _dialogOpen = true);
+    try {
+      await _editPicked(navigatorContext, keys);
+    } finally {
+      if (mounted) setState(() => _dialogOpen = false);
+      // Unless edit access ended meanwhile, which resets the tools.
+      if (mounted && context.read<EditorSessionBloc>().state.isEditor) {
+        tools.setPickMode(true);
+      }
+    }
+  }
+
+  Future<void> _editPicked(
+    BuildContext navigatorContext,
+    List<String> keys,
+  ) async {
     final key = keys.length == 1
         ? keys.single
         : await showDialog<String>(
@@ -195,7 +225,8 @@ class _L10nEditOverlayState extends State<L10nEditOverlay>
                       color: colors.primary.withValues(alpha: 0.06),
                     ),
                   ),
-                if (isEditor || config.onRequestAccess != null)
+                if (!_dialogOpen &&
+                    (isEditor || config.onRequestAccess != null))
                   Positioned(
                     right: 0,
                     bottom: 0,
